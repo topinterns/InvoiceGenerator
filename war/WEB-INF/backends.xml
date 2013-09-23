@@ -1,0 +1,10 @@
+<backends>
+  <backend name="test-backend">
+    <class>B8</class>
+    <options>
+    <dynamic>true</dynamic>
+    <public>true</public>
+    <fail-fast>true</fail-fast>
+    </options>
+  </backend>
+</backends>

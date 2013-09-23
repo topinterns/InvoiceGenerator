@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.asm-3.0.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.beans-3.0.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.context-3.0.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.core-3.0.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.expression-3.0.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.web-3.0.3.RELEASE.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/org.springframework.web.servlet-3.0.3.RELEASE.jar" sourcepath="/Users/bhadri/.m2/repository/org/springframework/spring-webmvc/3.0.3.RELEASE/spring-webmvc-3.0.3.RELEASE-sources.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/gmultipart-0.4.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/log4j-1.2.12.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-beanutils-1.8.3.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-digester-2.0.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-lang-2.1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-logging-1.1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/commons-logging-api-1.1.1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/jackson-core-asl-1.9.3.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/jackson-mapper-asl-1.9.3.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/appengine-awt.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/bcmail-jdk14-138.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/bcprov-jdk14-138.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/bctsp-jdk14-138.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/icu4j-4_8_1_1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/icu4j-charset-4_8_1_1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/itext-gae.1.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/itext-gae.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/itext-hyph-xml.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/iTextAsian.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/iTextAsianCmaps.jar"/>
+	<classpathentry kind="lib" path="war/WEB-INF/lib/sfntly.jar"/>
+	<classpathentry kind="lib" path="/Backup/Malleswari Backup/malliswari/External Jars for cloud Storage/appengine-gcs-client-0.3.jar"/>
+	<classpathentry kind="lib" path="/Backup/Malleswari Backup/malliswari/External Jars for cloud Storage/commons-collections-3.2.1.jar"/>
+	<classpathentry kind="lib" path="/Backup/Malleswari Backup/malliswari/External Jars for cloud Storage/guava-14.0.1.jar"/>
+	<classpathentry kind="con" path="com.google.appengine.eclipse.core.GAE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk 1.7 sdk"/>
+	<classpathentry kind="output" path="war/WEB-INF/classes"/>
+</classpath>
