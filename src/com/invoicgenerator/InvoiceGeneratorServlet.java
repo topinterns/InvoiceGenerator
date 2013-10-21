@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class InvoiceGeneratorServlet {
 
 
-	@RequestMapping("/")
+	/*@RequestMapping("/")
 	public String homePage(HttpServletRequest request,
 			HttpServletResponse response) throws IOException {
 		System.out.println("heloo Welcome");
 		return "home";
-	}
+	}*/
 }

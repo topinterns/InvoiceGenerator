@@ -287,7 +287,7 @@
      $('#mapForDelimitJson').val(JSON.stringify(mapContainsMap[record]));
      frm = document.getElementById("frmReportIframedelimit");
      
-     frm.action="/admin/generatedelimitpdf";
+     frm.action="/generatedelimitpdf";
      frm.method="post";
      frm.target="pdfdownloadIframedelimit";
      frm.submit();
@@ -333,7 +333,7 @@
      $('#mapForDelimitJson').val(JSON.stringify(mapContainsMap[record]));
      frm = document.getElementById("frmReportIframedelimit");
      
-     frm.action="/admin/generatedelimitpdf";
+     frm.action="/generatedelimitpdf";
      frm.method="post";
      frm.target="pdfdownloadIframedelimit";
      frm.submit();
@@ -341,19 +341,21 @@
       alert("Your Message has been sent successfully.");
     }
 
-    function generatepdf(currentRecord)
+    function generatepdf(currentRecord, keyForData)
     {    
+    	console.log("hai in generate pdf"+keyForData);
     	   var mapForEmail={};
     	   mapForEmail["currentRecord"]=currentRecord;
     	   mapForEmail["emailId"]="NA";
     	   mapForEmail["subject"]="NA";
     	   mapForEmail["body"]="NA";
-    	   	   
+    	   //var keyForDataFromSession = <%=session.getAttribute("keyForData") %>; 	   
     //console.info(JSON.stringify(mapForEmail));
      var frm,iput;
      $('#allStaffDetailsJson').val(JSON.stringify(mapForEmail));
+     $('#keyForDataInPdfDownload').val(keyForData);
      frm = document.getElementById("frmReportIframe");
-     frm.action="/admin/generatesinglepdf";
+     frm.action="/generatesinglepdf";
      frm.method="post";
      frm.target="pdfdownloadIframe";
      frm.submit();
@@ -361,9 +363,10 @@
 
 var i=0;
 var record="";
-function generatepdfForMail (currentRecord)
+function generatepdfForMail (currentRecord, keyForData)
  {    
-  i++;
+  console.log("mail::"+keyForData);
+	i++;
   if(i==1)
   record = currentRecord;
   
@@ -390,9 +393,10 @@ if(re.test(email))
  //iput = document.getElementById('allStaffDetailsJson').value = record+";"+email+";"+subject+";"+stringBody;
 // document.getElementById('allStaffDetailsJson').value ="testststsetestsetes";
  $('#allStaffDetailsJson').val(JSON.stringify(mapForEmail));
+ $('#keyForDataInPdfDownload').val(keyForData);
  frm = document.getElementById("frmReportIframe");
  
- frm.action="/admin/generatesinglepdf";
+ frm.action="/generatesinglepdf";
  frm.method="post";
  frm.target="pdfdownloadIframe";
  frm.submit();
@@ -478,7 +482,7 @@ function paymentDetails()
     //console.log(parametersJSON);
     $('#allStaffDetailsJson').val(parametersJSON);
    frm = document.getElementById("frmReportIframe");
-   frm.action="/admin/paymentReceipt";
+   frm.action="/paymentReceipt";
    frm.method="post";
    frm.target="pdfdownloadIframe";
    frm.submit();
@@ -486,7 +490,7 @@ function paymentDetails()
 	//alert(parametersJSON);
 	/*$.ajax({
 		   type: 'POST',
-		   url: '/admin/paymentReceipt',
+		   url: '/paymentReceipt',
 		   contentType: "application/json",
 		   beforeSend: function ( jqXHR )
 		   {
@@ -844,7 +848,7 @@ var parametersJSON =JSON.stringify(dataToBeSent) ;
 //alert(parametersJSON);
 $.ajax({
 	   type: 'POST',
-	   url: '/admin/ShowDetailsSubmitted',
+	   url: '/ShowDetailsSubmitted?fileName=keyForData',
 	   contentType: "application/json",
 	   beforeSend: function ( jqXHR )
 	   {

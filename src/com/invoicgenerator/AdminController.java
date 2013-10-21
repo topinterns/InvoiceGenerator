@@ -2,41 +2,29 @@ package com.invoicgenerator;
 
 import static com.google.appengine.api.taskqueue.TaskOptions.Builder.withUrl;
 
-
-import com.google.appengine.tools.cloudstorage.GcsFileOptions;
-import com.google.appengine.tools.cloudstorage.GcsFilename;
-import com.google.appengine.tools.cloudstorage.GcsInputChannel;
-import com.google.appengine.tools.cloudstorage.GcsOutputChannel;
-import com.google.appengine.tools.cloudstorage.GcsService;
-import com.google.appengine.tools.cloudstorage.GcsServiceFactory;
-
 import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.ObjectInputStream;
+import java.io.PrintWriter;
+import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
-import javax.jdo.PersistenceManager;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
@@ -48,6 +36,7 @@ import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
 import javax.mail.util.ByteArrayDataSource;
+import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -55,7 +44,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
+import org.codehaus.jackson.annotate.JsonMethod;
+import org.codehaus.jackson.map.DeserializationConfig.Feature;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.SerializationConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -65,8 +58,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 
-import com.google.appengine.api.ThreadManager;
-import com.google.appengine.api.backends.BackendServiceFactory;
 import com.google.appengine.api.blobstore.BlobKey;
 import com.google.appengine.api.blobstore.BlobstoreService;
 import com.google.appengine.api.blobstore.BlobstoreServiceFactory;
@@ -74,12 +65,25 @@ import com.google.appengine.api.files.AppEngineFile;
 import com.google.appengine.api.files.FileReadChannel;
 import com.google.appengine.api.files.FileService;
 import com.google.appengine.api.files.FileServiceFactory;
+import com.google.appengine.api.memcache.ErrorHandlers;
+import com.google.appengine.api.memcache.MemcacheService;
+import com.google.appengine.api.memcache.MemcacheServiceFactory;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
-import com.google.appengine.api.taskqueue.TaskOptions;
-import com.google.appengine.api.taskqueue.TaskOptions.Method;
-import com.google.appengine.repackaged.org.codehaus.jackson.JsonGenerationException;
-import com.google.appengine.repackaged.org.codehaus.jackson.map.JsonMappingException;
+import com.google.appengine.labs.repackaged.org.json.JSONException;
+import com.google.appengine.labs.repackaged.org.json.JSONObject;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.map.JsonMappingException;
+//import com.google.appengine.repackaged.org.codehaus.jackson.type.TypeReference;
+import org.codehaus.jackson.type.JavaType;
+import org.codehaus.jackson.type.TypeReference;
+import com.google.appengine.tools.cloudstorage.GcsFileOptions;
+import com.google.appengine.tools.cloudstorage.GcsFilename;
+import com.google.appengine.tools.cloudstorage.GcsInputChannel;
+import com.google.appengine.tools.cloudstorage.GcsOutputChannel;
+import com.google.appengine.tools.cloudstorage.GcsService;
+import com.google.appengine.tools.cloudstorage.GcsServiceFactory;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.pdf.AcroFields;
 import com.lowagie.text.pdf.PdfReader;
@@ -87,58 +91,92 @@ import com.lowagie.text.pdf.PdfStamper;
 
 
 @Controller
-@RequestMapping(value = "/admin")
-public class AdminController {
+@RequestMapping(value = "/")
+public class AdminController implements Serializable{
 
 	public static final Logger log = Logger.getLogger(AdminController.class.getName());
-	public static final HashMap<String, Map<String, Object>> lReturnUserObj = new HashMap<String, Map<String, Object>>();
-	public static boolean taskqueueStatus = false;
-	public static BlobKey blobKey;
-	//String eachInvoice = "Invoice Date\tAccount Name\tAccount Number\tPhone Number\tUser Id Summary\tTo Address\tTotal Due\tAmount Of Last Statement\tPayments Received\tDebits or Credits\tUnknown\tUnknown\tBalance Forward\tCurrent Charges\tTotal Due By Due Date\tTotal Due After Due Date\tFrom Address\tDate Due\tSummary Of Charges\tSummary Of Charges\tTotal Current Charges\n";
+	//public static final HashMap<String, Map<String, Object>> lReturnUserObj = new HashMap<String, Map<String, Object>>();
+	//public static boolean taskqueueStatus = false;
+	//public static BlobKey blobKey;
 	@Autowired
 	ServletContext context;
+	
 	@RequestMapping("/")
-	public String re_directhome(HttpServletRequest request,
+	public void homePage(HttpServletRequest request,
 			HttpServletResponse response) throws IOException {
-		return "home";
-	}
-	@RequestMapping("/home")
-	public String homePage(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
-		//System.out.println("heloo Welcome");
-		return "home";
-	}
-	BlobstoreService blobstoreService = BlobstoreServiceFactory.getBlobstoreService();
-	@RequestMapping("/uploadcsv")
-	public @ResponseBody String  uploadCsvFile(HttpServletRequest request, HttpServletResponse response,@RequestBody String text) throws IOException {
-		HttpSession lSession = request.getSession();
-		String responseText = "";
-		ArrayList<String> customersList = new ArrayList<String>();
-		ServletOutputStream out = response.getOutputStream();
-			Map<String, BlobKey> blobs = blobstoreService.getUploadedBlobs(request);
-			blobKey = blobs.get("uploadFile");
-			Queue queue 			= QueueFactory.getQueue("taskQueueToReadTextFileAndCreateStaticMap");
-			queue.add(withUrl("/admin/taskQueueToReadTextFileAndCreateStaticMap").param("data",""));
-			return blobKey.getKeyString();
+		System.out.println("heloo Welcome");
+		RequestDispatcher rd = request.getRequestDispatcher("homePage.html");
+		try {
+			rd.forward(request, response);
+		} catch (ServletException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
+		
+		//return "home";
+	}
+	
+	 @RequestMapping(value ="/uploadcsv", method = RequestMethod.POST)
+	 public @ResponseBody String  uploadCsvFile(HttpServletRequest request, HttpServletResponse response,@RequestParam("fileName") String uploadedFileName) throws IOException {
+		
+		BlobstoreService blobstoreService = BlobstoreServiceFactory.getBlobstoreService();
+		String memcacheKey=uploadedFileName+"_"+new Date().getTime();
+		BlobKey blobKey;
+		
+		HttpSession session = request.getSession();
+		session.setAttribute("keyForData", memcacheKey);
+		
+		Map<String, BlobKey> blobs = blobstoreService.getUploadedBlobs(request);
+		blobKey = blobs.get("uploadFile");
+		System.out.println("Got uploaded File.........");
+		
+		MemcacheService syncCache = MemcacheServiceFactory.getMemcacheService();
+	    syncCache.setErrorHandler(ErrorHandlers.getConsistentLogAndContinue(Level.INFO));
+	    syncCache.put("blobKey_"+memcacheKey, blobKey);
+	    //syncCache.put("blobKey_"+uploadedFileName+"_taskqueueStatus", false);
+	    
+	    Queue queue    = QueueFactory.getQueue("taskQueueToReadTextFileAndCreateStaticMap");
+	    queue.add(withUrl("/taskQueueToReadTextFileAndCreateStaticMap").param("blobKey","blobKey_"+memcacheKey));
+	    //return blobKey.getKeyString();
+	    
+	    return memcacheKey;
+	  }
+			
 	@RequestMapping("/getUploadedData")
-	public @ResponseBody HashMap<String, Map<String, Object>>  getUploadedData(HttpServletRequest request, HttpServletResponse response,@RequestBody String text) throws IOException {
-		HttpSession lSession = request.getSession();
-		//HashMap<String, Map<String, Object>> lReturnUserObj = new HashMap<String, Map<String, Object>>();
-		//lReturnUserObj = (HashMap<String, Map<String, Object>>) lSession.getAttribute("totalMap");
-				//System.out.println("getUploadedData service method  ...... "+lReturnUserObj.size());
-			return lReturnUserObj;
+	public @ResponseBody HashMap<String, Map<String, Object>>  getUploadedData(HttpServletRequest request, HttpServletResponse response,@RequestBody String keyForData) throws IOException {
+
+		HashMap<String, Map<String, Object>> lReturnUserObjFromCache = null;
+		try {
+			lReturnUserObjFromCache = readParsedObjectFromGCS(keyForData);
+		} 
+		catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-	@RequestMapping("/getTaskQueueStatus")
-	public @ResponseBody boolean  getTaskQueueStatus(HttpServletRequest request, HttpServletResponse response) throws IOException {
-			//System.out.println("inside taskqueueStatus service method   "+taskqueueStatus);
-			return taskqueueStatus;
+	    return lReturnUserObjFromCache;
 		}
+	
+	@RequestMapping(value="/getTaskQueueStatus", method = RequestMethod.POST)
+	public @ResponseBody boolean  getTaskQueueStatus(HttpServletRequest request, HttpServletResponse response,@RequestBody String keyForData) throws IOException, ClassNotFoundException, JSONException {
+		
+		//System.out.println("Key"+keyForData);
+
+		HashMap<String, Map<String, Object>> lReturnUserObjFromCache = readParsedObjectFromGCS(keyForData);
+		if(lReturnUserObjFromCache != null)
+			return true;
+		else
+		return false;
+		}
+	
 	@RequestMapping("/taskQueueToReadTextFileAndCreateStaticMap")
-	public @ResponseBody void getUrlForImportedContactsOnChrome(HttpServletRequest request, HttpServletResponse response,@RequestBody String text) throws IOException {
+	public @ResponseBody void getUrlForImportedContactsOnChrome(HttpServletRequest request, HttpServletResponse response,@RequestParam("blobKey") String blobKeyFromMemcache) throws IOException {
+		
 		ServletOutputStream out = response.getOutputStream();
-		////System.out.println("map size:"+lReturnUserObj.size());
-		//HashMap<String, Map<String, Object>> lReturnUserObj = new HashMap<String, Map<String, Object>>();
+		HashMap<String, Map<String, Object>> lReturnUserObj = new HashMap<String, Map<String, Object>>();
+		MemcacheService syncCache = MemcacheServiceFactory.getMemcacheService();
+	    syncCache.setErrorHandler(ErrorHandlers.getConsistentLogAndContinue(Level.INFO));
+	    BlobKey blobKey = (BlobKey) syncCache.get(blobKeyFromMemcache);
+		ArrayList<Map<String, Object>> listOfObjects = new ArrayList<Map<String, Object>>();
 		try {
 			FileService fileServices = FileServiceFactory.getFileService();
 			AppEngineFile fileURL = fileServices.getBlobFile(blobKey);
@@ -151,6 +189,7 @@ public class AdminController {
 			String phoneNumber = "";
 			String invoiceDate = "";
 			String dateDue = "";
+			boolean isPdfGenerated = false;
 			//String[] TotalDue = new String[10];
 			String[] address;
 			Double totalCurrentCharges= 0.0;
@@ -237,7 +276,7 @@ public class AdminController {
 									if (Character.isDigit(date.charAt(0))) {
 										date = generateRequiredDateFormat(date);
 										each4100Array.add(date);
-										String description = summaryChargesString.substring(8, 34);
+										String description = summaryChargesString.substring(8, 34).replace("   ","");
 										each4100Array.add(description);
 										Integer nom = Integer.parseInt(summaryChargesString
 												.substring(34, 42));
@@ -248,7 +287,7 @@ public class AdminController {
 									}
 								}
 							else
-								each4100Array.add(summaryChargesString);
+								each4100Array.add(summaryChargesString.replace("   ",""));
 							summaryOfCharges2.add(each4100Array);
 						}
 						if(line.startsWith("9200"))
@@ -330,23 +369,23 @@ public class AdminController {
 					detailsObject.put("summaryOfCharges", summaryOfCharges);
 					detailsObject.put("summaryOfCharges2", summaryOfCharges2);
 					detailsObject.put("userIdSummary", userIdSummary);
-
+					detailsObject.put("isPdfGenerated",isPdfGenerated);
+					listOfObjects.add(detailsObject);
 					lReturnUserObj.put(accountNumber, detailsObject);
-					//request.getSession().setAttribute("totalMap", lReturnUserObj);
-					////System.out.println("map size At end:"+lReturnUserObj.size());
 					
 				}
-				////System.out.println("map values:"+lReturnUserObj);
 			}
-
+		    //syncCache.put("listOfObjects", listOfObjects);
 		} catch (Exception e) {
 			e.printStackTrace();
 			out.println("fileerroruploading");
-			//System.out.println("Exception in sendig File URL.." + e);
+			System.out.println("Exception in sendig File URL.." + e);
 		}
-		////System.out.println(lReturnUserObj.size());
-		taskqueueStatus = true;
-    //System.out.println("task Queue Execution completed now");
+		System.out.println("Map Constructed:"+lReturnUserObj.size());
+		JSONObject jsonObjectOfMap = new JSONObject(lReturnUserObj);
+		uploadParsedJsonFileToGCS(jsonObjectOfMap, blobKeyFromMemcache.replace("blobKey_", ""), "Parsed_JSON", "application/json");
+		
+    System.out.println("task Queue Execution completed now");
 	}
 
 	public String generateRequiredDateFormat(String data) {
@@ -374,8 +413,9 @@ public class AdminController {
 		}
 		return TotalDue;
 	}
+	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public String generator(Map<String, Map<String, Object>> totalDetails) {
+	public String generator(HashMap<String, Map<String, Object>> totalDetails) {
 		String totalData = "";
 		Iterator iterateTotalDetails = totalDetails.entrySet().iterator();
 		while (iterateTotalDetails.hasNext()) {
@@ -413,7 +453,27 @@ public class AdminController {
 				else if (eachField instanceof ArrayList) {
 					ArrayList<Object> list = (ArrayList<Object>) eachField;
 					String summary = "";
-					if (eachKey.equals("summaryOfCharges")) {
+					String address = "";
+					if (eachKey.equals("TotalDue")) {
+						for (Object o : list) {
+							eachInvoice += (String)o + "\t";
+						}
+					}
+					 else if (eachKey.equals("address")) {
+						 String country = (String)list.get(list.size()-1);
+						 for (Object o : list) {
+							 String lastIndexCheck = (String)o;
+							 if(!(lastIndexCheck.equals(country)))
+								 address += (String)o + "&";
+						 }
+						 eachInvoice += address +"\t";
+					 }
+					 else if (eachKey.equals("fromAddress")) {
+						 for (Object o : list) 
+							 address += (String)o + "&";
+						 eachInvoice += address + "\t";
+					 } 
+					 else if (eachKey.equals("summaryOfCharges")) {
 						for (Object summaryOfChargesList : list) {
 							if (summaryOfChargesList instanceof String[]) {
 								String[] stringArray = (String[]) summaryOfChargesList;
@@ -449,12 +509,10 @@ public class AdminController {
 					Double floatValue = (Double) eachField;
 					eachInvoice += floatValue + "\t";
 				}
-				
 				else
 					eachInvoice += "\t";
 			}
 			totalData += eachInvoice + "\n";
-
 		}
 		// //System.out.println("In generator:"+totalData);
 		return totalData;
@@ -462,13 +520,16 @@ public class AdminController {
 
 	@RequestMapping(value = "/downloadcsv", method = RequestMethod.POST)
 	public void downloadFile(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
-		//final Logger log = Logger.getLogger(AdminController.class.getName());
+			HttpServletResponse response) throws IOException, ClassNotFoundException, IllegalArgumentException, JSONException {
 		//System.out.println("in download");
-		//HashMap<String, Map<String, Object>> lReturnUserObj = new HashMap<String, Map<String, Object>>();
-		//lReturnUserObj = (HashMap<String, Map<String, Object>>) request.getSession().getAttribute("totalMap");
+		String keyForData = request.getParameter("keyForData");
+		System.out.println("from front end::"+keyForData);
 		String invoiceHeader = "Invoice Date\tAccount Name\tAccount Number\tPhone Number\tUser Id Summary\tTo Address\tTotal Due\tAmount Of Last Statement\tPayments Received\tDebits or Credits\tUnknown\tUnknown\tBalance Forward\tCurrent Charges\tTotal Due By Due Date\tTotal Due After Due Date\tFrom Address\tDate Due\tSummary Of Charges\tSummary Of Charges\tTotal Current Charges\n";
-		String eachInvoice = generator(lReturnUserObj);
+		HashMap<String, Map<String, Object>> lReturnUserObjFromCache = readParsedObjectFromGCS(keyForData);
+	    if(lReturnUserObjFromCache!=null){
+	    	System.out.println("memcache values"+lReturnUserObjFromCache.size());
+	    }
+		String eachInvoice = generator(lReturnUserObjFromCache);
 		// log.info(eachInvoice);
 		response.setContentType("text/csv");
 		response.setHeader("Content-Disposition",
@@ -477,7 +538,7 @@ public class AdminController {
 		response.getWriter().write(eachInvoice);
 		//System.out.println("in download");
 	}
-//	
+	
 //	@RequestMapping("/bulkPdf")
 //	public void bulkPdf(HttpServletRequest request, HttpServletResponse response) throws IOException {
 //		String backendAddress = BackendServiceFactory.getBackendService()
@@ -499,28 +560,32 @@ public class AdminController {
 		generatePdf(lReturnUserObj, response,"mounika505@gmail.com","","");
 		return;
 	}*/
+	
 	@SuppressWarnings("rawtypes")
 	@RequestMapping(value = "/generatesinglepdf", method = RequestMethod.POST)
 	public void generateSinglePdf(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, JsonGenerationException,
-			JsonMappingException, IOException, DocumentException {
+			JsonMappingException, IOException, DocumentException, JSONException {
 	
 		ByteArrayOutputStream baos = null;
 		String requeststring =request.getParameter("allStaffDetailsJson");
+		String keyForData = request.getParameter("keyForDataInPdfDownload");
+		System.out.println("key from front end::"+keyForData);
 		Map<String,Object> requestMap = new ObjectMapper().readValue(requeststring, HashMap.class);
 		String mapIndex=requestMap.get("currentRecord").toString();
 		String emailId=requestMap.get("emailId").toString();
 		String subject=requestMap.get("subject").toString();
 		String body=requestMap.get("body").toString();
 		////System.out.println("email id:"+emailId);
-		Map<String, Object> mapDetails = lReturnUserObj.get(mapIndex);
-		////System.out.println(mapDetails);
+	    HashMap<String, Map<String, Object>> lReturnUserObjFromCache = readParsedObjectFromGCS(keyForData);
+	    if(lReturnUserObjFromCache!=null){
+	    	System.out.println("memcache values"+lReturnUserObjFromCache.size());
+	    }
+		Map<String, Object> mapDetails = lReturnUserObjFromCache.get(mapIndex);
 		HashMap<String, Map<String, Object>> mapWithSingleRow = new HashMap<String, Map<String, Object>>();
-		////System.out.println(lReturnUserObj.size());
 		mapWithSingleRow.put(mapIndex, mapDetails);
 		try{
 			if(emailId.equals("NA") && subject.equals("NA") && body.equals("NA")){
-				//zout = new ZipOutputStream(response.getOutputStream());
 				response.setContentType("application/pdf");
 				response.setHeader("Content-Disposition","attachment;filename="+mapIndex+".pdf");
 				
@@ -532,21 +597,21 @@ public class AdminController {
 		if(!emailId.equals("NA") && !subject.equals("NA") && !body.equals("NA"))
         mailing(baos, emailId,subject,body);
 		os.flush();
-		
-		
 		}
 		catch(Exception e){
-			
+			e.printStackTrace();
 		}
 	}
 	
 	@RequestMapping(value = "/generatebulkpdf", method = RequestMethod.POST)
-	 public void generateBulkPdf(HttpServletRequest request,HttpServletResponse response) throws ServletException, JsonGenerationException,JsonMappingException, IOException, DocumentException {
+	 public void generateBulkPdf(HttpServletRequest request,HttpServletResponse response) throws ServletException, JsonGenerationException,JsonMappingException, IOException, DocumentException, JSONException {
 		ZipOutputStream zout = null;
 		String emailId = "NA";
 		String subject = "NA";
 		String body = "NA";
 		ByteArrayOutputStream baos = null;
+		//String keyForData = request.getParameter("keyForDataInPdfDownload");
+		
 		try{
 		if(emailId.equals("NA") && subject.equals("NA") && body.equals("NA")){
 			zout = new ZipOutputStream(response.getOutputStream());
@@ -554,13 +619,12 @@ public class AdminController {
 			response.setHeader("Content-Disposition","attachment;filename=Invoice.zip");
 		}
 	  String rquestMap = request.getParameter("allStaffDetailsJson1");
-	  //System.out.println("map from front end:"+rquestMap);
 	  HashMap<String, Map<String, Object>> lReturnUserObjFront = new ObjectMapper().readValue(rquestMap, HashMap.class);
-	  Set<String> keys = lReturnUserObjFront.keySet();
+	 // Set<String> keys = lReturnUserObjFront.keySet();
 	  /*for(String s: keys)
 		  log.info(s);*/
 	  /*log.warning(lReturnUserObjFront.size()+"map size");*/
-	 
+	//  HashMap<String, Map<String, Object>> lReturnUserObjFromCache = readParsedObjectFromGCS(keyForData);
 	  Iterator it = lReturnUserObjFront.entrySet().iterator();
 		while(it.hasNext()){
 			Map.Entry mapEntryForMap = (Map.Entry) it.next();
@@ -1080,7 +1144,14 @@ public class AdminController {
 			detailsMap.put("userIdSummary", (ArrayList<ArrayList>) UISList);
 
 			// //System.out.println("The details of the map storing "+detailsMap);
-			lReturnUserObj.put(accoutNumber, detailsMap);
+			//MemcacheService syncCache = MemcacheServiceFactory.getMemcacheService();
+		    //syncCache.setErrorHandler(ErrorHandlers.getConsistentLogAndContinue(Level.INFO));
+		    //HashMap<String, Map<String, Object>> lReturnUserObjFromCache = (HashMap<String, Map<String, Object>>) syncCache.get("uploadeContenttest");
+			HashMap<String, Map<String, Object>> lReturnUserObjFromCache = readParsedObjectFromGCS("");
+		    if(lReturnUserObjFromCache!=null){
+		    	System.out.println("memcache values"+lReturnUserObjFromCache.size());
+		    }
+			lReturnUserObjFromCache.put(accoutNumber, detailsMap);
 		}
 
 		catch (Exception e) {
@@ -1168,8 +1239,8 @@ public class AdminController {
 			form.setField("fromAddress", fromAddress);
 			form.setField("paymentDescription", paymentDescription);
 			form.setField("payments", payments);
-			//stamper.setFormFlattening(true);
-			stamper.setFreeTextFlattening(true);
+			stamper.setFormFlattening(true);
+			//stamper.setFreeTextFlattening(true);
 			stamper.close();
 			reader.close();
 			log.info("altered successfully");
@@ -1758,8 +1829,13 @@ public class AdminController {
 		      //System.out.println("This is generatehtml template 'currentRecord is'   ::: "+currentRecord);	
 			//  ModelAndView mv=new ModelAndView("AC2pages");
 		      ModelAndView mv=null;
-
-			 Map<String, Object> mapDetails = lReturnUserObj.get(currentRecord);
+		      MemcacheService syncCache = MemcacheServiceFactory.getMemcacheService();
+			    syncCache.setErrorHandler(ErrorHandlers.getConsistentLogAndContinue(Level.INFO));
+			    HashMap<String, Map<String, Object>> lReturnUserObjFromCache = (HashMap<String, Map<String, Object>>) syncCache.get("uploadeContenttest");
+			    if(lReturnUserObjFromCache!=null){
+			    	System.out.println("memcache values"+lReturnUserObjFromCache.size());
+			    }
+			 Map<String, Object> mapDetails = lReturnUserObjFromCache.get(currentRecord);
 			 //System.out.println("THIS IS GENERATE HTML    ::::::"+mapDetails);
 			 HashMap<String, Map<String, Object>> mapWithSingleRow = new HashMap<String, Map<String, Object>>();
 			 mapWithSingleRow.put(currentRecord, mapDetails);
@@ -2054,7 +2130,7 @@ public class AdminController {
 				mapWithSingleRow.put(eachKeyForMap, eachValueMap);
 				String invoiceDate = (String)eachValueMap.get("invoiceDate");
 				baos = generatePdf(mapWithSingleRow);
-				uploadFileToGCS(baos.toByteArray(), eachKeyForMap,invoiceDate);
+				uploadFileToGCS(baos.toByteArray(), eachKeyForMap,invoiceDate, "application/pdf");
 				////System.out.println("in cloud Store");
 			}
 			
@@ -2062,29 +2138,31 @@ public class AdminController {
 			return true;
 		}
 		
-		private void uploadFileToGCS(byte[] bytesToPush, String fileName,String invoiceDate) throws IOException{
+		public void uploadFileToGCS(byte[] bytesToPush, String fileName,String folderName, String mimeType) throws IOException{
 
 			//System.out.println("Date String:"+invoiceDate);
 			String ACL_BUCKET_ACCESS="bucket-owner-read";
 			String BUCKET = "fs_invoice";
-			String OBJECT = invoiceDate.replaceAll("/","_")+"/"+fileName;
+			String OBJECT = folderName.replaceAll("/","_")+"/"+fileName;
 			//response.setContentType("text/plain");
 		    //response.getWriter().println("Hello, world from java");
 		    GcsService gcsService = GcsServiceFactory.createGcsService();
 		    GcsFilename filePath = new GcsFilename(BUCKET,OBJECT );
 		    log.info("filePath::"+filePath);
 		    //System.out.println("filePath::"+filePath);
-		    GcsFileOptions options = new GcsFileOptions.Builder().mimeType("application/pdf").acl(ACL_BUCKET_ACCESS).cacheControl("public,max-age=60,no-transform").build();
+		    GcsFileOptions options = new GcsFileOptions.Builder().mimeType(mimeType).acl(ACL_BUCKET_ACCESS).cacheControl("public,max-age=60,no-transform").build();
 		    GcsOutputChannel writeChannel = gcsService.createOrReplace(filePath, options);
+		   
 
-		   /* PrintWriter out = new PrintWriter(Channels.newWriter(writeChannel, "UTF8"));
+		    /*PrintWriter out = new PrintWriter(Channels.newWriter(writeChannel, "UTF8"));
 		    out.println("The woods are lovely dark and deep.");
 		    out.println("But I have promises to keep.");
 		    out.flush();
-		    */
+		    out.print(bytesToPush);*/
 		    writeChannel.waitForOutstandingWrites();
 		    writeChannel.write(ByteBuffer.wrap(bytesToPush));
 		    writeChannel.close();
+		    
 		    //System.out.println("Done successfully");
 		    
 		    //response.getWriter().println("Done writing...");
@@ -2098,5 +2176,71 @@ public class AdminController {
 		    }
 		    readChannel.close();*/
 			 }
+		
+		
+		public void uploadParsedJsonFileToGCS(JSONObject parsedMap, String fileName,String folderName, String mimeType) throws IOException{
+
+			//System.out.println(parsedMap);
+			String ACL_BUCKET_ACCESS="bucket-owner-read";
+			String BUCKET = "fs_invoice";
+			String OBJECT = folderName+"/"+fileName+".json";
+		    GcsService gcsService = GcsServiceFactory.createGcsService();
+		    GcsFilename filePath = new GcsFilename(BUCKET,OBJECT );
+		    log.info("filePath::"+filePath);
+		    GcsFileOptions options = new GcsFileOptions.Builder().mimeType(mimeType).acl(ACL_BUCKET_ACCESS).cacheControl("public,max-age=60,no-transform").build();
+		    GcsOutputChannel writeChannel = gcsService.createOrReplace(filePath, options);
+
+		    /*ObjectOutputStream oout = new ObjectOutputStream(Channels.newOutputStream(writeChannel));
+		    oout.writeObject(parsedMap);
+		    oout.flush(); 
+		    oout.close();*/
+		    PrintWriter out = new PrintWriter(Channels.newWriter(writeChannel, "UTF8"));
+		    out.print(parsedMap);
+		    out.flush();
+		   
+		    writeChannel.waitForOutstandingWrites();
+		    writeChannel.close();
+		    System.out.println("JSON stored");
+		    
+			 }
+		public HashMap<String, Map<String, Object>> readParsedObjectFromGCS(String parsedObjectName) throws IOException, JSONException{
+			
+			String ACL_BUCKET_ACCESS="bucket-owner-read";
+			String BUCKET = "fs_invoice";
+			String OBJECT = "Parsed_JSON"+"/"+parsedObjectName+".json";
+			GcsService gcsService = GcsServiceFactory.createGcsService();
+			GcsFilename filePath = new GcsFilename(BUCKET,OBJECT );
+			GcsInputChannel readChannel = null;
+			//JSONObject readJSON = null;
+			ObjectMapper objmapper = new ObjectMapper();
+			HashMap<String, Map<String, Object>> readJSONMap = new HashMap<String, Map<String, Object>>();
+			try {
+				readChannel = gcsService.openReadChannel(filePath, 0);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	
+			BufferedReader reader = new BufferedReader(Channels.newReader(readChannel, "UTF8"));
+		    String line;
+		    String readJsonString = null;
+		    while ((line = reader.readLine()) != null) {
+		    	//System.out.println("Read JSON::"+line);
+		    	//readJSON= new JSONObject(line);
+		    	readJsonString = line;
+		    }
+			
+		    /*objmapper.disableDefaultTyping();
+		    objmapper.setVisibility(JsonMethod.FIELD, Visibility.ANY);
+			HashMap<String, Map<String, Object>> readJSONMap  = objmapper.convertValue(readJSON, new TypeReference<HashMap<String, Map<String, Object>>>(){});
+			System.out.println("Map converted::"+readJSONMap);*/
+		    
+		    readJSONMap = objmapper.readValue(readJsonString, new TypeReference<HashMap<String, Map<String, Object>>>(){});
+		   // System.out.println("Map converted::"+readJSONMap);
+		    
+		    readChannel.close();
+			return readJSONMap;
+			
+		}
 		
 }

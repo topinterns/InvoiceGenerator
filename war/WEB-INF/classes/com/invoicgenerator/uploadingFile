@@ -1,0 +1,59 @@
+@RequestMapping("/fileUploadHandlerService")
+	public @ResponseBody String fileUploadMethod(@RequestBody Map<String,Object>request) {
+		mLogger.info("File Uplad Service Data"+Helper.mapToString(request, false));
+		String uploadType=Helper.correctNull(request.get("uploadType"));
+		String fileName=Helper.correctNull(request.get("name"));
+		String randomId = UUID.randomUUID().toString().substring(0,8);
+		MCacheManager.set(randomId, request);
+		FileUploadSerivice uploadSerice=new FileUploadSerivice();
+		ArrayList<List<String>> subList=null;
+		String csvData = "";
+		try{
+			csvData = new String(Base64.decodeBase64(((String)request.get("data")).getBytes()));
+			List<List<String>> dataList =  uploadSerice.returnDataList(csvData);
+			if(dataList != null){
+				mLogger.info("Total No of List in the File :"+dataList.size());
+				if(uploadType.equalsIgnoreCase("invoice")){
+					service.fileUploadGateway(dataList, uploadSerice, subList,"invoice");
+				}
+				else if(uploadType.equalsIgnoreCase("synclioId")){
+					if(fileName.equalsIgnoreCase("Remove-SynclioID-From-JDO.csv")){
+						Map<String,Object> parameterMap=new HashMap<String, Object>();
+						parameterMap.put("dataList", dataList);
+						Map<String,Object> responseMap=gson.fromJson(new String(CustomHttpRequest.generatePostRequest(Constants.INVOICEGATEWAYURL+"/removeDeletedUsersSynclioId", parameterMap)), Map.class);
+					}
+					else if(fileName.equalsIgnoreCase("Liveuser-accountname-synclioid.csv")){
+						service.fileUploadGateway(dataList, uploadSerice, subList,"company");
+					}
+					else if(fileName.equalsIgnoreCase("Analyse-Live-User-Synclioid.csv")){
+						service.fileUploadGateway(dataList, uploadSerice, subList,"analyseSynclioId");
+					}
+					else if(fileName.equalsIgnoreCase("Updated-UserPlans-Details.csv")){
+						service.fileUploadGateway(dataList, uploadSerice, subList,"plan");
+					}
+					else if(fileName.equalsIgnoreCase("CallRecords.csv")){
+						service.fileUploadGateway(dataList, uploadSerice, subList,"cdr");
+					}
+					else{
+						service.fileUploadGateway(dataList, uploadSerice, subList,"synclioId");
+					}
+				}
+				else if(uploadType.equalsIgnoreCase("payapalPeriod")){
+					service.fileUploadGateway(dataList, uploadSerice, subList,"payapalPeriod");
+				}
+				else if(uploadType.equalsIgnoreCase("paymentWithDESC")){
+					service.fileUploadGateway(dataList, uploadSerice, subList,"paymentWithDESC");
+				}
+				else if(uploadType.equalsIgnoreCase("paypalSalesTransaction")){
+					service.fileUploadGateway(dataList, uploadSerice, subList,"paypalSalesTransaction");
+				}
+				else{
+					service.fileUploadGateway(dataList, uploadSerice, subList,"payapalAmount");
+				}
+			}
+		}
+		catch(Exception e){
+			mLogger.log(Level.WARNING, e.getMessage(), e);
+		}
+		return "Successfully Uploaded";
+	}

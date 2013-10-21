@@ -12,7 +12,9 @@
 <head>
 <script type="text/javascript" src="/js/jquery-1.7.2.min.js"></script>
 <script type="text/javascript" src="/js/ajaxfileupload.js"></script>
+<script type="text/javascript" src="/_ah/channel/jsapi"></script>
 <script type="text/javascript" src="/js/loadDetails.js"></script>
+<script type="text/javascript" src="/js/FileUploading.js"></script>
 <link rel="stylesheet" type="text/css"
 	href="../bootstrap/css/bootstrap.css">
 <link rel="stylesheet" type="text/css"
@@ -64,17 +66,55 @@
 }
 </style>
 <script type="text/javascript">
-/* $(document).ready(function() 
-	    { 
-	        $("#myTable").tablesorter(); 
-	    } 
-	);  */
-	    
 
-var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
+function s4() {
+	  return Math.floor((1 + Math.random()) * 0x10000)
+	             .toString(16)
+	             .substring(1);
+	};
+
+	function guid() {
+	  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+	         s4() + '-' + s4() + s4() + s4();
+	}
+
+var urlForGen='<%=blobstoreService.createUploadUrl("/uploadGen")%>';
+function uploadGen(uploadedGen) {
+	console.log($('#fileForGen').val().split("\\").pop());
+	var fileName = ($('#fileForGen').val().split("\\").pop()).toString();
+	 $('.backdrop').animate({
+		'opacity' : '.50'
+	}, 300, 'linear');
+	$('.backdrop').css('display', 'block');
+	$('#loading-indicator').show();
+	var pictureElement = uploadedGen;
+	var file_Id = uploadedGen.id;
+	
+	$.ajaxFileUpload({
+		url : urlForGen,
+		secureuri : false,
+		fileElementId : pictureElement.id,
+		dataType: 'json',
+		data : {fileName:fileName},
+		success : function(data) {
+			console.log("In success function:"+data);
+			$('#loading-indicator').hide();
+			$('.backdrop').css('display', 'none');
+			alert("Your Data is Ready, you can download now...");
+			$('#downloadbtn').show();
+			$('.download').attr('value',data); 
+		}
+	});
+}
+
+
+
+var url='<%=blobstoreService.createUploadUrl("/uploadcsv")%>';
 	var uploadedData;
 	var taskQueueStatus = false;
 	function uploadcsv(uploadedcsv) {
+		console.log($('#file').val().split("\\").pop());
+		var fileName = ($('#file').val().split("\\").pop()).toString();
 		$('.backdrop').animate({
 			'opacity' : '.50'
 		}, 300, 'linear');
@@ -82,18 +122,22 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 		$('#loading-indicator').show();
 		$('#loading-indicator').show();
 		var pictureElement = uploadedcsv;
-
 		var file_Id = uploadedcsv.id;
-
+		
 		$.ajaxFileUpload({
 			url : url,
 			secureuri : false,
 			fileElementId : pictureElement.id,
+			dataType: 'json',
+			data : {fileName:fileName},
 			success : function(data) {
-
+				console.log("In success function:"+data);
+				keyForData = data;
+				 <% session.setAttribute("keyForData", "keyForData"); %>
 				$('#loading-indicator').hide();
 				$('.backdrop').css('display', 'none');
 				$('#checktaskqueue').show();
+				
 
 			}
 		});
@@ -101,20 +145,22 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 
 	function checkTaskQueueStatus() {
 		console.info(taskQueueStatus + ">>>heloooooo>>>>>>>>>");
+		var keyForDataFromSession = <%=session.getAttribute("keyForData") %>;
 		if (!taskQueueStatus) {
 			$.ajax({
 				type : 'POST',
-				url : '/admin/getTaskQueueStatus',
+				url : '/getTaskQueueStatus',
 				contentType : "application/json",
 				beforeSend : function(jqXHR) {
-					jqXHR.setRequestHeader("Connection", "close");
+					//jqXHR.setRequestHeader("Connection", "close");
 				},
 				async : false,
-				data : "",
+				data : keyForDataFromSession,
 				success : function response(resultObject) {
 					console.info(resultObject);
 					taskQueueStatus = resultObject;
 					if (taskQueueStatus) {
+						<%-- alert(<%=session.getAttribute("keyForData")%>); --%>
 						getUploadedData();
 					} else {
 						alert("Processing... please wait ")
@@ -127,18 +173,19 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 		}
 
 	}
-
+	//var t="'"+keyForDataFromSession+"'";
 	function getUploadedData() {
-		
+		var keyForDataFromSession = <%=session.getAttribute("keyForData") %>;
+		var key = "'"+keyForDataFromSession+"'"
 				$.ajax({
 					type : 'POST',
-					url : '/admin/getUploadedData',
+					url : '/getUploadedData',
 					contentType : "application/json",
 					beforeSend : function(jqXHR) {
-						jqXHR.setRequestHeader("Connection", "close");
+						//jqXHR.setRequestHeader("Connection", "close");
 					},
 					async : false,
-					data : "",
+					data : keyForDataFromSession,
 					success : function response(data) {
 						$('.backdrop').animate({
 							'opacity' : '.50'
@@ -213,12 +260,11 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 									+ '</td><td>' + userIdSummary + '</td>';
 							/* tableData+='<td><a href="#myModal" data-toggle="modal" >Download Pdf & Send an Email</a></td></tr>'; */
 							/*   tableData+='<td><a href="#" onclick=generatepdf('+ind+') >Download Pdf & Send an Email</a></td></tr>'; */
-							tableData += '<td><a href="#myModal" onclick=generatepdfForMail('
-									+ tempIndex
-									+ ') data-toggle="modal" >Send an Email</a></td>';
+							tableData += '<td><a href="#myModal" onclick=generatepdfForMail('+ tempIndex+ ','+key+') data-toggle="modal" >Send an Email</a></td>';
 							$('.send').attr('id',ind);
-							tableData +='<td><a href="#" onclick=generatepdf('+tempIndex+') >Download Pdf</a></td>';
-							tableData +='<td><a target="_blank" href="/admin/generatehtmltemplate?currentRecord='+tempIndex+'">View in Html</a></td></tr>';
+							$('.send').attr('key',123);
+							tableData +='<td><a href="#" onclick=generatepdf('+tempIndex+','+key+') >Download Pdf</a></td>';
+							tableData +='<td><a target="_blank" href="/generatehtmltemplate?currentRecord='+tempIndex+'">View in Html</a></td></tr>';
 							
 						}
 
@@ -232,274 +278,22 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 						});
 						$('#loading-indicator').hide();
 						$('.backdrop').css('display', 'none');
-						$("#myTable").tablesorter();
+						//$("#myTable").tablesorter();
 					},
 					dataType : ''
 				});
 	}
 	
 	
-// 	 function generatepdf(currentRecord)
-// 	    {    
-// 	    	   var mapForEmail={};
-// 	    	   mapForEmail["currentRecord"]=currentRecord;
-// 	    	   mapForEmail["emailId"]="NA";
-// 	    	   mapForEmail["subject"]="NA";
-// 	    	   mapForEmail["body"]="NA";
-	    	   	   
-// 	    //console.info(JSON.stringify(mapForEmail));
-// 	     var frm,iput;
-// 	     $('#allStaffDetailsJson').val(JSON.stringify(mapForEmail));
-// 	     frm = document.getElementById("frmReportIframe");
-// 	     frm.action="/admin/generatesinglepdf";
-// 	     frm.method="post";
-// 	     frm.target="pdfdownloadIframe";
-// 	     frm.submit();
-// 	    }
-
-	 
-// 	 var i=0;
-// 	 var record="";
-// 	 function generatepdfForMail (currentRecord)
-// 	 {    
-// 	   i++;
-// 	   if(i==1)
-// 	   record = currentRecord;
-	   
-// 	   if(i==2){
-	 	
-// 	   var email=$("#emailid").val(); 
-// 	   var subject=$("#subjectemail").val();
-// 	   var body=""; 
-// 	   body=$("#textareaemail").val();
-// 	  // alert( "Thisis currentRecord "+record+"  email id ::= "+email+"  subject  "+subject+"  body "+body);
-	 	   
-	 	  
-// 	 	   var mapForEmail={};    
-// 	 	   mapForEmail["currentRecord"]=record;
-// 	 	   mapForEmail["emailId"]=email;
-// 	 	   mapForEmail["subject"]=subject;
-// 	 	   mapForEmail["body"]=body;
-	 	   	   
-// 	 //console.info(JSON.stringify(mapForEmail));
-// 	 var re = /\S+@\S+\.\S+/;
-// 	 if(re.test(email))
-// 	 {
-// 	  var frm,iput;
-// 	  //iput = document.getElementById('allStaffDetailsJson').value = record+";"+email+";"+subject+";"+stringBody;
-// 	 // document.getElementById('allStaffDetailsJson').value ="testststsetestsetes";
-// 	  $('#allStaffDetailsJson').val(JSON.stringify(mapForEmail));
-// 	  frm = document.getElementById("frmReportIframe");
-	  
-// 	  frm.action="/admin/generatesinglepdf";
-// 	  frm.method="post";
-// 	  frm.target="pdfdownloadIframe";
-// 	  frm.submit();
-// 	  i=0;
-
-// 	  $("#emailid").val("");
-// 	  $("#subjectemail").val("");
-// 	  $("#textareaemail").val("This is Invoice Generator, Thank you........");
-
-	  
-// 	 }
-// 	 else{
-// 	 	alert("Enter valid emailid");
-// 	 	 var s="malli";
-// 	 	//console.log("variable value:"+s); 
-// 	 	i=0;
-
-// 	 	 $("#emailid").val("");
-// 	 	 $("#subjectemail").val("");
-// 	 	 $("#textareaemail").val("This is Invoice Generator, Thank you........");
-// 	 }
-
-// 	  }
-// 	 }
-	 
-	 
-	/* var i = 0;
-	var record;
-	function generatepdf(currentRecord) {
-		i++;
-		if (i == 1) 
-			record = currentRecord;
-		if (i == 2) {
-			var email = $("#emailid").val();
-			var re = /\S+@\S+\.\S+/;
-			if (re.test(email)) {
-				var frm, iput;
-				iput = document.getElementById('allStaffDetailsJson').value = record
-						+ email;
-				frm = document.getElementById("frmReportIframe");
-				frm.action = "/admin/generatesinglepdf";
-				frm.method = "post";
-				frm.target = "pdfdownloadIframe";
-				frm.submit();
-				i = 0;
-			} else 
-				alert("Enter valid emailid");
-		}
-		$("#emailid").val("");
-	} */
-	
-	/*var i=0;
-	var record;
-	function generatepdf(currentRecord)
-	{    
-	      i++;
-		  if(i==1)
-		  record = currentRecord;
-	      
-		  if(i==2){
-			
-		  var email=$("#emailid").val(); 
-		  var subject=$("#subjectemail").val();
-		  var body=""; 
-		  body=$("#textareaemail").val();
-		  alert( "Thisis currentRecord "+record+"  email id ::= "+email+"  subject  "+subject+"  body "+body);
-			   
-			  
-			   var mapForEmail={};
-			   mapForEmail["currentRecord"]=record;
-			   mapForEmail["emailId"]=email;
-			   mapForEmail["subject"]=subject;
-			   mapForEmail["body"]=body;
-			   	   
-		console.info(JSON.stringify(mapForEmail));
-		var re = /\S+@\S+\.\S+/;
-		if(re.test(email))
-		{
-		 var frm,iput;
-		 //iput = document.getElementById('allStaffDetailsJson').value = record+";"+email+";"+subject+";"+stringBody;
-		// document.getElementById('allStaffDetailsJson').value ="testststsetestsetes";
-		 $('#allStaffDetailsJson').val(JSON.stringify(mapForEmail));
-		 frm = document.getElementById("frmReportIframe");
-		 
-		 frm.action="/admin/generatesinglepdf";
-		 frm.method="post";
-		 frm.target="pdfdownloadIframe";
-		 frm.submit();
-		 i=0;
-
-		 $("#emailid").val("");
-		 $("#subjectemail").val("");
-		 $("#textareaemail").val(" This is Invoice Generator, Thank you........");
-		
-		 
-		}
-		else{
-			alert("Enter valid emailid");
-			/* var s="malli";
-			console.log("variable value:"+s); */
-		//}
-
-		 ///}
-//	}*/
-
-	/* function generatepdf(currentRecord)
-		{
-
-			  var email = window.prompt("Enter email id"); 
-			// window.alert(email);  
-			var re = /\S+@\S+\.\S+/;
-			if(re.test(email))
-			{
-			 var frm,iput;
-			 iput = document.getElementById('allStaffDetailsJson').value = currentRecord+email;
-			 frm = document.getElementById("frmReportIframe");
-			 frm.action="/admin/generatesinglepdf";
-			 frm.method="post";
-			 frm.target="pdfdownloadIframe";
-			 frm.submit();
-			}
-			else{
-				alert("Enter valid emailid");
-			}
-
-		}  */
-
-	/* function generatebulk() {
-		var frm, iput;
-		  iput = document.getElementById('allStaffDetailsJson').value = currentRecord+email; 
-		frm = document.getElementById("frmReportIframe1");
-		frm.action = "/admin/generatebulkpdf";
-		frm.method = "post";
-		frm.target = "pdfdownloadIframe1";
-		frm.submit();
-	} */
-	
-	
-
-	/* var i=0;
-	var record="";
-	function generatepdf(currentRecord)
-	{    
-	  i++;
-	  if(i==1)
-	  record = currentRecord;
-	  
-	  if(i==2){
-		
-	  var email=$("#emailid").val(); 
-	  var subject=$("#subjectemail").val();
-	  var body=""; 
-	  body=$("#textareaemail").val();
-	 // alert( "Thisis currentRecord "+record+"  email id ::= "+email+"  subject  "+subject+"  body "+body);
-		   
-		  
-		   var mapForEmail={};
-		  // mapForEmail["currentRecord"]=record;
-		   mapForEmail["emailId"]=email;
-		   mapForEmail["subject"]=subject;
-		   mapForEmail["body"]=body;
-		   	   
-	console.info(JSON.stringify(mapForEmail));
-	var re = /\S+@\S+\.\S+/;
-	if(re.test(email))
-	{
-	 var frm,iput;
-	 //iput = document.getElementById('allStaffDetailsJson').value = record+";"+email+";"+subject+";"+stringBody;
-	// document.getElementById('allStaffDetailsJson').value ="testststsetestsetes";
-	 $('#allStaffDetailsJson').val(JSON.stringify(mapForEmail));
-	 $('#mapWithCurrentRecordJson').val(JSON.stringify(uploadedData[record]));
-	 frm = document.getElementById("frmReportIframe");
-	 
-	 frm.action="/admin/generatesinglepdf";
-	 frm.method="post";
-	 frm.target="pdfdownloadIframe";
-	 frm.submit();
-	 i=0;
-
-	 $("#emailid").val("");
-	 $("#subjectemail").val("");
-	 $("#textareaemail").val(" This is Invoice Generator, Thank you........");
-
-	 
-	}
-	else{
-		alert("Enter valid emailid");
-		// var s="malli";
-		//console.log("variable value:"+s); 
-		i=0;
-
-		 $("#emailid").val("");
-		 $("#subjectemail").val("");
-		 $("#textareaemail").val(" This is Invoice Generator, Thank you........");
-	}
-
-	 }
-	} */
-	
 	function generatebulk(){
 		   var frm,iput;
 		     //iput = document.getElementById('allStaffDetailsJson').value = currentRecord+email; 
 		  //   console.log(JSON.stringify(uploadedData));
-		     //frm.action="http://jsbackend.3.topinterns.appspot.com/admin/generatebulkpdf";
+		     //frm.action="http://jsbackend.3.topinterns.appspot.com/generatebulkpdf";
 		     console.log("data in the generate bulk pdf:"+uploadedData);
 		   $('#allStaffDetailsJson1').val(JSON.stringify(uploadedData));
 		    frm = document.getElementById("frmReportIframe1");
-		    frm.action = "http://test-backend.topinterns.appspot.com/admin/generatebulkpdf";
+		    frm.action = "/generatebulkpdf";
 		    frm.method="post";
 		    frm.target="pdfdownloadIframe1";
 		    frm.submit();
@@ -516,20 +310,32 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 		var frm,iput;
 	   $('#allStaffDetailsJson1').val(JSON.stringify(mapContainsMap));
 	    frm = document.getElementById("frmReportIframe1");
-	    frm.action = "/admin/generatebulkpdf";
+	    frm.action = "/generatebulkpdf";
 	    frm.method="post";
 	    frm.target="pdfdownloadIframe1";
 	    frm.submit();
+	}
+	
+	function downloadcsv(){
+		var keyForDataFromSession = <%=session.getAttribute("keyForData") %>;
+		alert(keyForDataFromSession);
+		var frm;
+		$("#keyForData").val(keyForDataFromSession);
+		frm = document.getElementById("downloadCSV");
+		 frm.action = "/downloadcsv";
+		 frm.method = "post";
+		 frm.submit();
+		
 	}
 	function cloudStore(){
 		var parametersJSON = JSON.stringify(uploadedData);
 		$.ajax({
 			   type: 'POST',
-			   url: '/admin/cloudStore',
+			   url: '/cloudStore',
 			   contentType: "application/json",
 			   beforeSend: function ( jqXHR )
 			   {
-			    jqXHR.setRequestHeader("Connection", "close");
+			    //jqXHR.setRequestHeader("Connection", "close");
 			   },
 			   async: false,
 			   data : parametersJSON ,
@@ -703,115 +509,15 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 	    tableDelimitData+='<td><a href="#myModalDelimit" onclick=generatedelimitpdfForMail('+ind+') data-toggle="modal" >Send an Email</a></td>';
 	    tableDelimitData+='<td><a href="#" onclick=generatedelimitpdf('+ind+')  >Download Pdf</a></td></tr>';
 	    //$('.send').attr('id',ind); 
-	   
-	    
 	    $('#searchbody').html(tableDelimitData);
-	  
 	  }  
-	  
-	  
-	  
-	  
 	 else{
-	  
-	  
 	  $('#errorHeader').show();
 	     $('#search').hide();
 	     $('#searchbody').hide(); 
 	 }
 	}
 
-
-	/* function searchData() {
-
-		var check = "";
-		check = uploadedData[$('#textboxid').val()];
-		alert(check.accountNumber);
-		if (check) {
-
-			$('#errorHeader').hide();
-			$('.tablesearch').show();
-			$('#search').show();
-			$('#searchbody').show();
-
-			var tabledata = "";
-
-			tabledata = '<tr><td>' + check.accountNumber + '</td><td>'
-					+ check.phoneNumber + '</td><td>' + check.invoiceDate
-					+ '</td><td>' + check.dateDue + '</td><td>' + check.address
-					+ '</td>';
-
-			for (index in check.TotalDue) {
-				tabledata += '<td>'
-				tabledata += check.TotalDue[index]
-				tabledata += '</td>'
-			}
-
-			var summarycharges = "";
-			var summarycharges2 = "";
-			var userIdSummary = "";
-
-			for (index in check.summaryOfCharges) {
-				var tempscr = "";
-				for (index1 in check.summaryOfCharges[index]) {
-					tempscr += check.summaryOfCharges[index][index1] + "  ";
-				}
-				summarycharges += tempscr;
-			}
-
-			tabledata += '<td>' + summarycharges + '</td>';
-
-			for (index in check.summaryOfCharges2) {
-				var tempscr = "";
-				for (index1 in check.summaryOfCharges2[index]) {
-					tempscr += check.summaryOfCharges2[index][index1] + "  ";
-				}
-				summarycharges2 += tempscr;
-			}
-			
-			for (index in check.userIdSummary) {
-				var tempscr = "";
-				for (index1 in check.userIdSummary[index]) {
-					tempscr += check.userIdSummary[index][index1]
-							+ "  ";
-				}
-				userIdSummary += tempscr;
-			}
-
-			if (check.totalCurrentCharges)
-				tabledata += '<td>' + check.totalCurrentCharges + '</td>';
-			else
-				tabledata += '<td></td>';
-			if (check.fromAddress)
-				tabledata += '<td>' + check.fromAddress + '</td>';
-			else
-				tabledata += '<td></td>';
-
-			 
-			
-			tabledata += '<td>' + check.accountName
-					+ '</td><td>' + summarycharges2
-					+ '</td><td>' + userIdSummary + '</td>';
-			
-			tabledata+='<td><a href="#myModal" onclick=generatepdf("'+$('#textboxid').val()+'") data-toggle="modal" >Download Pdf & Send an Email</a></td></tr>';
-			         
-			$('.send').attr('id',check);
-			$('#searchbody').html(tabledata);
-			
-
-
-		} else {
-			alert("no matches");
-			$('#errorHeader').show();
-			$('#search').hide();
-			$('#searchbody').hide();
-		}
-	} */
-	
-	/* function show(){
-		
-		alert($('#myTable th').text());
-	} */
 </script>
 <title>Invoice Creator</title>
 
@@ -820,6 +526,8 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 	<!-- <img src="/logo.gif" /> --> 
 	<img src="/bootstrap/img/loading.gif"
 		id="loading-indicator" class="loading" />
+		
+
 		
  
 <!-- changing here ***************************************************************************************************** -->
@@ -848,7 +556,7 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
          <a href="#" class="dropdown-toggle" data-toggle="dropdown">Downloads <b class="caret"></b></a>
                         <ul class="dropdown-menu">
                          
-                          <li><form action="/admin/downloadcsv" method="post"><input type="submit" class="notAButton" value="Download CSV File"></form></li>
+                          <li><a onclick="downloadcsv()"><input type="submit" class="notAButton" value="Download CSV"></a></li>
                          
                           <li><a onclick="generatebulk()"><input type="submit" class="notAButton" value="Download all PDF"></a></li>
                           <li><a onclick="generateSelected('AnswerConnect')"><input type="submit" class="notAButton" value="Download AC PDFs"></a></li>
@@ -863,27 +571,17 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
                           <li><a target="_blank" href="../pages/receipt.jsp">Payment Reciept</a></li>
                           <li><a target="_blank" href="../pages/receipt.jsp">Credit Reciept</a></li>
                         </ul>
+          </li >
+          <li class = "dropdown">
+          	 <a href="#" class="dropdown-toggle" data-toggle="dropdown">Payment uploads <b class="caret"></b></a>
+          	 <ul class="dropdown-menu">
+                          <li><a href="#" ><input  type="file" id="fileForGen" name="uploadGenFile" onchange="uploadGen(this)" />Gen File</a></li>
+                          
+             </ul>
           </li>
        
+       
 </ul> 
-<!-- <ul  class= "nav">
-<li class='active' ><a href='#'>Home</a></li>
-<li class='' ><a href="#" class="dropdown-toggle" data-toggle="dropdown">Uploads <b class="caret"></b></a>
-						<ul class="dropdown-menu">
-                          <li><a href="#" ><input  type="file" id="file" name="uploadFile" onchange="uploadcsv(this)" />CAS File</a></li>
-                          <li id="uploadDelimit"><a href="#"><input type="file" id="file" onchange='readText(this)' />Delimited File</a></li>
-							 <script type="text/javascript">checkFileAPI('"uploadDelimit"');</script> 
-                        </ul>
-</li>
-<li class='' ><a href='#'>Home</a></li>
-<li class=''><a href="#" class="dropdown-toggle" data-toggle="dropdown">Downloads <b class="caret"></b></a>
-						<ul class="dropdown-menu">
-                          <li><form action="/admin/downloadcsv" method="post"><input type="submit" class="notAButton" value="Download CSV File"></form></li>
-                          <li><a onclick="generatebulk()">Download all PDF</a></li>
-                        </ul>
-</li>
-<li class='' ><a href='#'>Home</a></li>
-</ul> -->
         <form class="navbar-search pull-right">
         <!--  <input onkeyup='searchData()' type="text" class="search-query span2" 
           placeholder="Account Number" id="searchField"> -->
@@ -910,56 +608,10 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 	<!-- <div class="container" style="width: 1250px;"> -->
 	<div class="container" style="width: 1250px;">
 
-		<!--  <div class="navbar-search pull-right">
-			<i class="icon-search"></i> <input type="text" id="textboxid"
-				onkeyup="searchData()" placeholder="Account Number"
-				style="background-color: antiquewhite"> <br>  -->
-			<!-- <a href="/pages/CustomInvoice.jsp"><input class="btn btn-primary"
-				style="align: center" type="submit" value="Custom Invoice" /></a> <br>
-			<br>
-			<a href="/pages/receipt.jsp"><input class="btn btn-primary"
-				style="align: center" type="submit" value="Payment Receipt Generator" /></a> <br>
-				<br><a href="/pages/receipt.jsp"><input class="btn btn-primary"
-				style="align: center" type="submit" value="Credit Receipt Generator" /></a> <br> -->
-			
-			<!-- <input class="btn btn-large btn-success" onclick="generatebulk()"
-				style="align: center" type="button" value="Download All Pdfs" /> -->
-	<!-- 	</div>  -->
-
-		<!-- <div>
-			<br> <span><b style="font-family: r;">Upload Text
-					file</b><br>
-			<br>
-			<input class="btn btn-info" type="file" id="file" name="uploadFile"
-				onchange="uploadcsv(this)" /></span>
-		</div>
-		&nbsp &nbsp
-		<br> -->
-		<!-- <form action="/admin/downloadcsv" method="post"> -->
-		
 		<a href="#"><input type="button" class="btn btn-primary" id='checktaskqueue' style="align: center; display: none"
 				onClick="checkTaskQueueStatus()"
 				value="Click Here To Populate The Result" /></a> 
 		
-		<a href="#"><input type="button" class="btn btn-danger" id="cloud" value="Push data to cloud storage" onClick="cloudStore()"/></a>
-		
-			<!-- <input class="btn btn-large btn-success" style="align: center"
-				type="submit" value="Download CSV" /> -->
-		<!-- </form> -->
-		
-		<!-- CHOOSE DELIMITED FILE -->
-
-		<!-- <div id="uploadDelimit">
-			<br> <span><b style="font-family: r;">Upload
-					Delimited File</b><br>
-			<br> <input class="btn btn-info" type="file" id="file"
-				onchange='readText(this)' />
-				<br />
-		</div> 
-		 <script type="text/javascript">
-			checkFileAPI('"uploadDelimit"');
-		</script> -->
-
 		<!-- TABLES  STARTED-->
 		
 		<!-- Table for Search Function -->
@@ -999,6 +651,10 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 			</table>
 			<br>
 			<br>
+	<div id = "download"><form action="/downloadGen" method="post">
+	<input type ="hidden" id="keyForResponse" class ="download" name="keyForResponse" value="">
+	<input class="btn btn-success " id ="downloadbtn" type="submit" value ="Download" style="display:none"/></form>
+	</div>
 		</center>
 		
 		<!-- Table for Invoice Details -->
@@ -1048,9 +704,10 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 	
 	<!-- Form for single PDF download -->
 	
-	<form id="frmReportIframe" name="frmReportIframe" target="pdfdownloadIframe" action="/admin/generatepdf" method="post">
+	<form id="frmReportIframe" name="frmReportIframe" target="pdfdownloadIframe" action="/generatepdf" method="post">
 		<input id="allStaffDetailsJson" name="allStaffDetailsJson" type="hidden" value="" />
 		<input id="mapWithCurrentRecordJson" name="mapWithCurrentRecordJson" type="hidden" value="" /> 
+		<input id="keyForDataInPdfDownload" name= keyForDataInPdfDownload type ="hidden" value=keyForData/>
 		<input id="btnSubmit" name="btnSubmit" type="button" style="display: none;" />
 	</form>
 	<iframe style="display: none" id="pdfdownloadIframe" name="pdfdownloadIframe"></iframe>
@@ -1058,7 +715,7 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 		
 	<!-- Form for delimit file data submit -->	
 	
-	<form id="frmReportIframedelimit" name="frmReportIframedelimit" target="pdfdownloadIframedelimit" action="/admin/generatedelimitpdf" method="post">
+	<form id="frmReportIframedelimit" name="frmReportIframedelimit" target="pdfdownloadIframedelimit" action="/generatedelimitpdf" method="post">
     	<input id="allStaffDetailsJsondelimit" name="allStaffDetailsJsondelimit" type="hidden" value="" />
     	<input id="mapForDelimitJson" name="mapForDelimitJson" type="hidden" value="" />
    	 	<input id="btnSubmitdelimit" name="btnSubmitdelimit" type="button" style="display:none;" />
@@ -1068,11 +725,19 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 	
 	<!-- Form for Bulk Download  -->
 	
-	<form id="frmReportIframe1" name="frmReportIframe1" target="pdfdownloadIframe1" action="/admin/bulkPdf" method="post">
+	<form id="frmReportIframe1" name="frmReportIframe1" target="pdfdownloadIframe1" action="/bulkPdf" method="post">
 		<input id="allStaffDetailsJson1" name="allStaffDetailsJson1" type="hidden" value="" /> 
 		<input id="btnSubmit1" name="btnSubmit1" type="button" style="display: none;" />
 	</form>
 	<iframe style="display: none" id="pdfdownloadIframe1" name="pdfdownloadIframe1"></iframe>
+	
+	
+	<!-- Form for Download CSV -->
+	
+	<form id="downloadCSV" name="downloadCSV" action="/downloadcsv" method="post">
+    	<input id="keyForData" name="keyForData" type="hidden" value="" />
+   	 	<input id="btnSubmitdownloadcsv" name="btnSubmitdownloadcsv" type="button" style="display:none;" />
+   </form>
 
 	<!-- HIDDEN FORMS FOR SUBMITTING THE DATA TO THE CONTROLLER ENDED-->
 	
@@ -1107,7 +772,7 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 		<div class="modal-footer">
 			<button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
 			<button type="button" id="sendemail" class="btn btn-primary send"
-				data-dismiss="modal" onclick="generatepdfForMail(this.id)">Send
+				data-dismiss="modal" key="" onclick="generatepdfForMail(this.id,this.key)">Send
 				Email</button>
 		</div>
 	</div>
@@ -1149,6 +814,11 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 
 	<!-- MODAL FOR EMAIL EDITOR ENDED -->
 	
+
+<script>
+
+</script>	
+	
 </body>
 </html>
 
@@ -1169,7 +839,7 @@ var url='<%=blobstoreService.createUploadUrl("/admin/uploadcsv")%>';
 </table>
 </center>
 </div>
-<form action="/admin/downloadcsv" method="post">
+<form action="/downloadcsv" method="post">
 <input style="align:center" type="submit" value="Download"/>
 </form>
 </body>

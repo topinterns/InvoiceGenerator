@@ -1,0 +1,49 @@
+public Map<String,String> getPaypalParameterMap(List<String> list,String transactionType){
+		 Map<String,String> paramMap=new HashMap<String, String>();
+		 paramMap.put("TENDER", "C");
+		 paramMap.put("ACCT", list.get(0));
+		 paramMap.put("EXPDATE", list.get(1).replace("/", ""));
+		 paramMap.put("AMT", list.get(2));
+		 if(transactionType.equalsIgnoreCase("sale")){
+			 paramMap.put("TRXTYPE", "S");
+		 }
+		 if(transactionType.equalsIgnoreCase("recurring")){
+			 SimpleDateFormat sdf =  new SimpleDateFormat("MMddyyyy");
+			 Calendar calendar = Calendar.getInstance();
+			 calendar.add(Calendar.MONTH, 1);
+			 calendar.set(Calendar.DAY_OF_MONTH, 3);
+			 Date date=calendar.getTime();
+			 paramMap.put("TRXTYPE", "R");
+			 paramMap.put("ACTION", "A");
+			 paramMap.put("MAXFAILPAYMENTS", "3");
+			 paramMap.put("RETRYNUMDAYS", "4");
+			 paramMap.put("START", sdf.format(date));
+			 paramMap.put("PAYPERIOD", "MONT");
+			 paramMap.put("TERM", "0");
+			 paramMap.put("PROFILENAME", new StringBuffer().append(list.get(4)).append("").toString());
+		 }
+		 paramMap.put("COMMENT1",new StringBuffer().append(list.get(4)).append("-").append(list.get(3)).append("").toString());
+		 paramMap.put("DESC", new StringBuffer().append("ACTI DBA ").append(list.get(4)).append(" TUALATIN OR 98760").toString());
+		 return paramMap;
+	 }
+
+
+else if(updationType.equalsIgnoreCase("paypalSalesTransaction")){
+				System.out.println("paypal_sales_transaction");
+				Map<String,Object> tempMap=null;
+				StringBuffer profileString =  new StringBuffer();
+				profileString.append("CreditCardNumber").append(",").append("ExpiryDate").append(",").append("Amount").append(",").append("Comment").append(",").append("Product Name").append(",").append("ResponseMessage").append(",").append("ProfileId").append(",").append("PNREF Number").append("\n");
+				for(int index=0;index<dataListsize;index++){
+					mLogger.info("list :"+dataList.get(index));
+					Map<String,String> paramMap=service.getPaypalParameterMap(dataList.get(index), "sale");
+					tempMap=new HashMap<String, Object>();
+					tempMap.put("dataMap", paramMap);
+					System.out.println(Helper.mapToString(tempMap, false));
+					mLogger.info(""+Helper.mapToString(tempMap, false));
+					Map<String,Object> paypalResponseMap=gson.fromJson(new String(CustomHttpRequest.generatePostRequest(Constants.INVOICEGATEWAYURL+"/paymentProcessing_with_DESC", tempMap)),Map.class);
+					profileString.append( dataList.get(index).get(0)).append(",").append( dataList.get(index).get(1)).append(",").append( dataList.get(index).get(2)).append(",").append( dataList.get(index).get(3)).append(",").append( dataList.get(index).get(4)).append(",").append(paypalResponseMap.get("RESPMSG")).append(",").append(paypalResponseMap.get("PROFILEID")).append(",").append(paypalResponseMap.get("PNREF")).append("\n");
+				}
+				EmailUtil.sendMailWithAttachment("billing@synclio.com", "PayPal Profile Creation with DESC ", "Response from paypal", "Paypal_Response.csv", profileString.toString().getBytes(), "text/csv", "text/csv; charset=iso-8859-1");
+				response.addHeader("Content-Disposition", "attachment; filename=\"Paypal_Response.csv\"");
+				response.getOutputStream().write(profileString.toString().getBytes(), 0, profileString.toString().getBytes().length);
+			}

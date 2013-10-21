@@ -305,7 +305,7 @@ var numberForUser=1;
 
 
  <!-- PDF GENERATE CODE -->
-<!-- <form id="frmReportIframe" name="frmReportIframe" target="pdfdownloadIframe" action="/admin/generatepdf" method="post">
+<!-- <form id="frmReportIframe" name="frmReportIframe" target="pdfdownloadIframe" action="/generatepdf" method="post">
     <input id="allStaffDetailsJson" name="allStaffDetailsJson" type="hidden" value="" />
     <input id="btnSubmit" name="btnSubmit" type="button" style="display:none;" />
    </form>
@@ -313,7 +313,7 @@ var numberForUser=1;
  -->
 
 <form id="frmReportIframe" name="frmReportIframe"
-		target="pdfdownloadIframe" action="/admin/generatepdf" method="post">
+		target="pdfdownloadIframe" action="/generatepdf" method="post">
 		<input id="allStaffDetailsJson" name="allStaffDetailsJson"
 			type="hidden" value="" />
 			<input id="mapWithCurrentRecordJson" name="mapWithCurrentRecordJson"
